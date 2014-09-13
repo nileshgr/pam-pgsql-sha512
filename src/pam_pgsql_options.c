@@ -26,6 +26,15 @@ read_config_file(modopt_t *options)
 	char buffer[1024];
 	char *eq,*val,*end;
 
+	/*
+	 * Switch to root so that config file is readable.
+	 * Not sure if this is the right way. I'd like to know if there's a better solution.
+	 */
+
+	uid_t ruid;
+	getresuid(&ruid, NULL, NULL);
+	setresuid(0, -1, -1);
+
 	if(access(options->fileconf, R_OK) == 0) {
 
 		fp = fopen(options->fileconf, "r");
@@ -112,7 +121,10 @@ read_config_file(modopt_t *options)
 					options->pw_type = PW_CRYPT;
 				} else if(!strcmp(val, "crypt_md5")) {
 					options->pw_type = PW_CRYPT_MD5;
-				} else if(!strcmp(val, "md5_postgres")) {
+				} else if(!strcmp(val, "crypt_sha512")) {
+					options->pw_type = PW_CRYPT_SHA512;
+				}
+				else if(!strcmp(val, "md5_postgres")) {
 					options->pw_type = PW_MD5_POSTGRES;
 				}
 			} else if(!strcmp(buffer, "debug")) {
@@ -126,6 +138,8 @@ read_config_file(modopt_t *options)
 	} else {
 		SYSLOG("no access for config file");
 	}
+
+	setresuid(ruid, -1, -1);
 
 	return;
 }

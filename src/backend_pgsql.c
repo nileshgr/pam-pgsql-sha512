@@ -32,6 +32,8 @@
 static char *
 crypt_makesalt(pw_scheme scheme);
 
+static char* crypt_sha512_makesalt();
+
 /* very private: used only in get_module_options */
 static char *
 build_conninfo(modopt_t *options)
@@ -284,6 +286,16 @@ password_encrypt(modopt_t *options, const char *user, const char *pass, const ch
 				s = strdup(crypt(pass, salt));
 			}
 		break;
+		case PW_CRYPT_SHA512: {
+			if (salt == NULL) {
+				char *newsalt = crypt_sha512_makesalt();
+				s = strdup(crypt(pass, newsalt));
+				free(newsalt);
+			} else {
+				s = strdup(crypt(pass, salt));
+			}
+		}
+		break;
 		case PW_MD5: {
 			unsigned char hash[16] = { 0, }; /* 16 is the md5 block size */
 			int i;
@@ -357,4 +369,35 @@ crypt_makesalt(pw_scheme scheme)
 	while(pos<len)result[pos++]=i64c(random()&63);
 	result[len]=0;
 	return result;
+}
+
+/*
+Taken from
+https://github.com/grawity/code/blob/master/security/mkpasswd.c
+*/
+
+static char* crypt_sha512_makesalt() {
+	char base64[] = "abcdefghijklmnopqrstuvwxyz"
+					"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+					"0123456789./";
+
+	char buf[12], salt[20];
+	unsigned i=0, j=3;
+
+	gcry_create_nonce(buf, 12);
+	strncpy(salt, "$6$", 3);
+
+	while (i < sizeof(buf)) {
+		char a = i < sizeof(buf) ? buf[i++] : 0;
+		char b = i < sizeof(buf) ? buf[i++] : 0;
+		char c = i < sizeof(buf) ? buf[i++] : 0;
+		long triple = (a << 020) + (b << 010) + c;
+		salt[j++] = base64[(triple >> 3*6) & 077];
+		salt[j++] = base64[(triple >> 2*6) & 077];
+		salt[j++] = base64[(triple >> 1*6) & 077];
+		salt[j++] = base64[(triple >> 0*6) & 077];
+	}
+	salt[j++] = 0;
+	
+	return strdup(salt);
 }
